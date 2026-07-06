@@ -10,6 +10,7 @@ interface Props {
   type?: 'button' | 'submit' | 'reset';
   'aria-label'?: string;
   id?: string;
+  style?: React.CSSProperties;
 }
 
 export function MagneticButton({
@@ -18,7 +19,9 @@ export function MagneticButton({
   onClick,
   disabled,
   type = 'button',
-  ...props
+  'aria-label': ariaLabel,
+  id,
+  style
 }: Props) {
   const ref = useRef<HTMLButtonElement>(null);
   const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -51,8 +54,9 @@ export function MagneticButton({
       className={className}
       animate={{ x: pos.x, y: pos.y }}
       transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
-      aria-label={props['aria-label']}
-      id={props.id}
+      aria-label={ariaLabel}
+      id={id}
+      style={style}
     >
       <motion.span
         className="inline-flex items-center justify-center gap-[inherit] w-full h-full"

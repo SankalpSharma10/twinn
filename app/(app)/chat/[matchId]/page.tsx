@@ -42,7 +42,8 @@ export default function ChatRoomPage({ params }: { params: { matchId: string } }
         
       if (matchData) {
         const isUserA = matchData.user_a === user.id;
-        setOtherUser(isUserA ? matchData.profile_b : matchData.profile_a);
+        const profile = isUserA ? matchData.profile_b : matchData.profile_a;
+        setOtherUser((Array.isArray(profile) ? profile[0] : profile) as any);
       }
 
       // 2. Fetch existing messages

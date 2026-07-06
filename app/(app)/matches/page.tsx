@@ -45,7 +45,8 @@ export default function MatchesPage() {
       } else if (data) {
         const formatted = data.map((m: any) => {
           const isUserA = m.user_a === user.id;
-          const otherProfile = isUserA ? m.profile_b : m.profile_a;
+          const otherProfileRaw = isUserA ? m.profile_b : m.profile_a;
+          const otherProfile = Array.isArray(otherProfileRaw) ? otherProfileRaw[0] : otherProfileRaw;
           return {
             id: m.id,
             matched_at: m.matched_at,

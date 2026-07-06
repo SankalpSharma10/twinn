@@ -5,6 +5,7 @@ import { copy } from '@/copy/strings';
 import { MagneticButton } from '@/components/motion/MagneticButton';
 import { AlertCircle } from 'lucide-react';
 import { ease } from '@/lib/motion/tokens';
+import { createClient } from '@/lib/supabase/client';
 
 interface Props {
   email: string;
@@ -55,15 +56,32 @@ export function StepOTP({ email, onNext, setLoading }: Props) {
     if (code.length < CODE_LENGTH) { setError(copy.errors.otp_invalid); return; }
     setError('');
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 600));
+
+    const supabase = createClient();
+    const { error: authError } = await supabase.auth.verifyOtp({
+      email,
+      token: code,
+      type: 'email',
+    });
+
     setLoading(false);
+
+    if (authError) {
+      setError(authError.message);
+      return;
+    }
+
     onNext({ verified: true });
   };
 
-  const handleResend = () => {
+  const handleResend = async () => {
     setResendTimer(RESEND_DELAY);
     setDigits(Array(CODE_LENGTH).fill(''));
     refs.current[0]?.focus();
+    
+    // Actually resend the OTP
+    const supabase = createClient();
+    await supabase.auth.signInWithOtp({ email });
   };
 
   const isComplete = digits.every(Boolean);

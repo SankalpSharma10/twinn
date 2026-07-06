@@ -92,10 +92,50 @@ function SpotifyBadge({ data }: { data: SpotifyData }) {
 
 function DiscoverClient({ initialMode }: { initialMode: Mode }) {
   const [mode, setMode] = useState<Mode>(initialMode);
+  const [profiles, setProfiles] = useState<ProfileWithSpotify[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = seedProfiles.filter((p) => p.mode === mode);
+  // In a real app, this comes from auth
+  const MY_ID = '11111111-1111-1111-1111-000000000001';
+
+  useEffect(() => {
+    let mounted = true;
+    async function fetchProfiles() {
+      setLoading(true);
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+      
+      // We fetch all other profiles. In the full app, we'd use the get_candidates RPC 
+      // but that requires quiz vectors which the seed doesn't generate yet.
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .neq('id', MY_ID)
+        .limit(20);
+
+      if (mounted && data) {
+        // Map DB fields to our Profile interface
+        const mapped = data.map(p => ({
+          id: p.id,
+          display_name: p.display_name,
+          year: p.year || '',
+          major: p.major || '',
+          pronouns: p.pronouns || '',
+          compatibility: 0.7 + Math.random() * 0.25, // Mock score for now
+          mode: mode,
+          tags: ['seed profile', 'from db'],
+          photo_blurhash: p.photo_blurhash,
+        }));
+        setProfiles(mapped as ProfileWithSpotify[]);
+      }
+      if (mounted) setLoading(false);
+    }
+    fetchProfiles();
+    return () => { mounted = false; };
+  }, [mode]);
 
   const handleSwipe = async (_profileId: string, decision: 'like' | 'pass' | 'super') => {
+    // Optimistic UI — just return matched occasionally for demo
     await new Promise((r) => setTimeout(r, 200));
     const matched = decision !== 'pass' && Math.random() < 0.3;
     return { matched };
@@ -119,7 +159,7 @@ function DiscoverClient({ initialMode }: { initialMode: Mode }) {
           style={{ color: 'var(--bone-400)', transitionDuration: '240ms' }}
           aria-label="Twinn home"
         >
-          twinn<span style={{ color: 'var(--ember-500)' }}>.</span>
+          twinn
         </Link>
 
         {/* Mode switcher */}
@@ -204,11 +244,17 @@ function DiscoverClient({ initialMode }: { initialMode: Mode }) {
 
       {/* Card stack */}
       <div className="flex-1 flex flex-col px-6 py-6 max-w-sm mx-auto w-full">
-        <CardStack
-          profiles={filtered.length > 0 ? filtered : seedProfiles.slice(0, 3).map((p) => ({ ...p, mode }))}
-          onSwipe={handleSwipe}
-          mode={mode}
-        />
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center">
+            <span className="body-sm" style={{ color: 'var(--bone-400)' }}>{copy.loading.discover[mode] || copy.loading.discover.default}</span>
+          </div>
+        ) : (
+          <CardStack
+            profiles={profiles}
+            onSwipe={handleSwipe}
+            mode={mode}
+          />
+        )}
       </div>
     </main>
   );

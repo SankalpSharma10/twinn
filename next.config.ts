@@ -8,8 +8,14 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'images.unsplash.com' },
     ],
   },
-  // Turbopack is the default in Next.js 16.
-  // GLSL shaders are inlined as template literals — no loader required.
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "sharp$": false,
+      "onnxruntime-node$": false,
+    };
+    return config;
+  },
   turbopack: {},
 };
 

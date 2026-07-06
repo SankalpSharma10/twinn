@@ -8,12 +8,18 @@ interface Props {
 }
 
 const pronounOptions = ['she/her', 'he/him', 'they/them', 'ask me'];
-const yearOptions    = ["'25", "'26", "'27", "'28", 'grad'];
+const yearOptions    = ["'25", "'26", "'27", "'28", "'29", "'30", 'grad'];
 const majors         = [
-  'Computer Science', 'Data Science', 'Electrical Engineering', 'Mechanical Engineering',
-  'Biology', 'Chemistry', 'Physics', 'Mathematics', 'Economics', 'Statistics',
-  'Pre-Med', 'Psychology', 'Political Science', 'Philosophy', 'English',
-  'Architecture', 'Design', 'Business', 'Linguistics', 'Sociology', 'Other',
+  'B.Tech Computer Science and Engineering',
+  'B.Tech CSE (Cyber Security)',
+  'B.Tech Artificial Intelligence and Machine Learning',
+  'B.Tech Robotics and Artificial Intelligence',
+  'B.Tech Information Technology',
+  'B.Tech Electronics & Communication',
+  'B.Tech Biotechnology',
+  'B.Tech Mathematics & Computing',
+  'BCA (Bachelor of Computer Applications)',
+  'Other',
 ];
 
 export function StepBasics({ onNext }: Props) {

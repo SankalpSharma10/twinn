@@ -8,6 +8,8 @@ insert into allowed_domains (domain, campus_name) values
   ('uchicago.edu', 'University of Chicago')
 on conflict do nothing;
 
+SET session_replication_role = 'replica';
+
 -- UC Berkeley profiles (10)
 do $$ declare begin
   insert into profiles (id, email, edu_domain, display_name, pronouns, year, major, photo_blurhash, verified) values
@@ -52,3 +54,6 @@ do $$ declare begin
   on conflict do nothing;
 
 end $$;
+
+SET session_replication_role = 'origin';
+

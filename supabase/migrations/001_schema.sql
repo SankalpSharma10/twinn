@@ -9,10 +9,14 @@ create table if not exists profiles (
   edu_domain text not null,
   display_name text not null,
   pronouns text,
-  year text check (year in ('25','26','27','28','grad')),
+  year text check (year in ('25','26','27','28','29','30','grad')),
   major text,
   photo_url text,
   photo_blurhash text,
+  artist_hindi text,
+  artist_english text,
+  artist_punjabi text,
+  vibe_vector vector(384),
   bio text,
   verified boolean default false,
   created_at timestamptz default now()
@@ -30,7 +34,7 @@ create table if not exists user_modes (
   user_id uuid references profiles(id) on delete cascade,
   mode_id text references modes(id),
   active boolean default true,
-  quiz_vector vector(32),
+  quiz_vector vector(384),
   quiz_answers jsonb,
   updated_at timestamptz default now(),
   primary key (user_id, mode_id)
@@ -201,7 +205,7 @@ create trigger on_swipe_insert
   after insert on swipes
   for each row execute function create_match_if_mutual();
 
--- Discovery: ranked candidates by quiz vector similarity
+-- Discovery: ranked candidates by vibe vector similarity
 create or replace function get_candidates(
   p_user_id uuid,
   p_mode_id text,
@@ -215,10 +219,14 @@ returns table (
   photo_url text,
   photo_blurhash text,
   pronouns text,
+  bio text,
+  artist_hindi text,
+  artist_english text,
+  artist_punjabi text,
   compatibility float
 )
 language sql
-security invoker
+security definer
 stable
 as $$
   select
@@ -229,10 +237,14 @@ as $$
     p.photo_url,
     p.photo_blurhash,
     p.pronouns,
+    p.bio,
+    p.artist_hindi,
+    p.artist_english,
+    p.artist_punjabi,
     (
-      1 - (um.quiz_vector <=> (
-        select quiz_vector from user_modes
-        where user_id = p_user_id and mode_id = p_mode_id
+      1 - (p.vibe_vector <=> (
+        select vibe_vector from profiles
+        where id = p_user_id
       ))
     ) as compatibility
   from profiles p
@@ -244,7 +256,7 @@ as $$
       select swipee_id from swipes
       where swiper_id = p_user_id and mode_id = p_mode_id
     )
-  order by compatibility desc
+  order by compatibility desc nulls last
   limit p_limit;
 $$;
 

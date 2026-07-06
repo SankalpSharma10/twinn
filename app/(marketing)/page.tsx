@@ -66,7 +66,6 @@ export default function LandingPage() {
 
           <Link href="/" className="font-display text-xl font-medium flex items-center gap-2" style={{ color: 'var(--bone-100)' }} aria-label="Twinn home">
             twinn
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--ember-500)' }} aria-hidden="true" />
           </Link>
 
           <div className="hidden md:flex items-center gap-8">

@@ -1,5 +1,6 @@
 'use client';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { createClient } from '@/lib/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { copy } from '@/copy/strings';
 import { MagneticButton } from '@/components/motion/MagneticButton';
@@ -31,6 +32,74 @@ export default function JoinPage() {
 
   const back = useCallback(() => setStep((s) => Math.max(s - 1, 1)), []);
 
+  const hasSaved = useRef(false);
+
+  useEffect(() => {
+    if (step === TOTAL_STEPS && !hasSaved.current) {
+      hasSaved.current = true;
+      const saveProfile = async () => {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const email = user.email || data.email as string;
+        const edu_domain = email?.split('@')[1] || 'jiit.ac.in';
+        const display_name = `${data.firstName || ''} ${data.lastName || ''}`.trim();
+        const photo_blurhash = 'L5H2EC=PM+yV0g-mq.wG9c01JPRj'; // Dummy blurhash for now
+
+        // --- ML VECTOR GENERATION ---
+        const vibeString = `Student in ${data.major}, Class of ${data.year}. Music taste: ${data.artist_hindi}, ${data.artist_english}, ${data.artist_punjabi}.`;
+        
+        const worker = new Worker(new URL('../../../lib/ml/worker.ts', import.meta.url), { type: 'module' });
+        
+        worker.postMessage({ text: vibeString });
+        
+        worker.addEventListener('message', async (event) => {
+          if (event.data.status === 'complete') {
+            const vibe_vector = event.data.output; // The 384 array!
+
+            // 1. Upsert Profile
+            const { error: profileError } = await supabase
+              .from('profiles')
+              .upsert({
+                id: user.id,
+                email,
+                edu_domain,
+                display_name,
+                pronouns: data.pronouns as string,
+                year: data.year as string,
+                major: data.major as string,
+                artist_hindi: data.artist_hindi as string,
+                artist_english: data.artist_english as string,
+                artist_punjabi: data.artist_punjabi as string,
+                vibe_vector: vibe_vector, // Save the ML vector
+                photo_blurhash,
+                verified: true,
+              }, { onConflict: 'id' });
+            
+            if (profileError) console.error('Error saving profile:', profileError);
+
+            // 2. Upsert Modes
+            const modes = (data.modes as string[]) || [];
+            for (const mode of modes) {
+              const { error: modeError } = await supabase
+                .from('user_modes')
+                .upsert({
+                  user_id: user.id,
+                  mode_id: mode,
+                  active: true,
+                }, { onConflict: 'user_id,mode_id' });
+              
+              if (modeError) console.error(`Error saving mode ${mode}:`, modeError);
+            }
+          }
+        });
+      };
+
+      saveProfile();
+    }
+  }, [step, data]);
+
   return (
     <main className="min-h-screen flex flex-col" style={{ background: 'var(--ink-950)' }} aria-label="Join Twinn">
       <TopProgressBar loading={loading} />
@@ -49,7 +118,7 @@ export default function JoinPage() {
           </button>
         ) : (
           <Link href="/" className="font-display text-xl transition-colors" style={{ color: 'var(--bone-400)', transitionDuration: '240ms' }}>
-            twinn<span style={{ color: 'var(--ember-500)' }}>.</span>
+            twinn
           </Link>
         )}
 

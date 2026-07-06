@@ -1,259 +1,170 @@
 'use client';
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import Link from 'next/link';
-import { copy } from '@/copy/strings';
+import { useEffect, useState, useRef } from 'react';
+import { createClient } from '@/lib/supabase/client';
 import { ArrowLeft, Send } from 'lucide-react';
-import { ease, duration } from '@/lib/motion/tokens';
+import Link from 'next/link';
+import Image from 'next/image';
 
-interface Message {
+type Message = {
   id: string;
+  sender_id: string;
   body: string;
-  isOwn: boolean;
-  time: string;
-}
+  created_at: string;
+};
 
-const matchMeta = {
-  m1: { name: 'Maya Patel',  mode: 'study',     color: '#8FB37A', icebreakers: copy.icebreakers.study },
-  m2: { name: 'Jordan Kim',  mode: 'study',     color: '#8FB37A', icebreakers: copy.icebreakers.study },
-  m3: { name: 'Alex Chen',   mode: 'hackathon', color: '#E8B34A', icebreakers: copy.icebreakers.hackathon },
-  m4: { name: 'Priya Nair',  mode: 'gym',       color: '#FF6A2E', icebreakers: copy.icebreakers.gym },
-  m5: { name: 'Leo Santos',  mode: 'gym',       color: '#FF6A2E', icebreakers: copy.icebreakers.gym },
-  m6: { name: 'Nina Wu',     mode: 'study',     color: '#8FB37A', icebreakers: copy.icebreakers.study },
-} as const;
-
-const seedMessages: Message[] = [
-  { id: '1', body: 'hey! matched in study mode 👀', isOwn: false, time: '3h' },
-  { id: '2', body: 'haha yeah, orgo is destroying me rn', isOwn: true, time: '3h' },
-  { id: '3', body: 'same honestly. library tomorrow at 2pm?', isOwn: false, time: '2m' },
-];
-
-interface PageProps {
-  params: Promise<{ matchId: string }>;
-}
-
-export default function ChatPage({ params }: PageProps) {
-  const [matchId] = useState('m1');
-  const meta = matchMeta[matchId as keyof typeof matchMeta] ?? matchMeta.m1;
-
-  const [messages, setMessages] = useState<Message[]>(seedMessages);
-  const [input, setInput]       = useState('');
-  const [typing, setTyping]     = useState(false);
+export default function ChatRoomPage({ params }: { params: { matchId: string } }) {
+  const matchId = params.matchId;
+  const supabase = createClient();
+  
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [otherUser, setOtherUser] = useState<{ display_name: string; photo_url: string | null } | null>(null);
+  
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    async function loadData() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      setCurrentUserId(user.id);
+
+      // 1. Fetch match details to get other user info
+      const { data: matchData } = await supabase
+        .from('matches')
+        .select(`
+          user_a, user_b,
+          profile_a:profiles!matches_user_a_fkey(id, display_name, photo_url),
+          profile_b:profiles!matches_user_b_fkey(id, display_name, photo_url)
+        `)
+        .eq('id', matchId)
+        .single();
+        
+      if (matchData) {
+        const isUserA = matchData.user_a === user.id;
+        setOtherUser(isUserA ? matchData.profile_b : matchData.profile_a);
+      }
+
+      // 2. Fetch existing messages
+      const { data: msgs } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('match_id', matchId)
+        .order('created_at', { ascending: true });
+        
+      if (msgs) setMessages(msgs);
+    }
+    
+    loadData();
+
+    // 3. Setup Realtime Subscription
+    const channel = supabase
+      .channel(`chat_${matchId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `match_id=eq.${matchId}` },
+        (payload) => {
+          setMessages((prev) => [...prev, payload.new as Message]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [matchId, supabase]);
+
+  // Auto-scroll to bottom
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Simulate typing indicator on first message
-  useEffect(() => {
-    const t = setTimeout(() => { setTyping(true); setTimeout(() => setTyping(false), 2500); }, 4000);
-    return () => clearTimeout(t);
-  }, []);
-
-  const sendMessage = useCallback(() => {
-    if (!input.trim()) return;
-    const msg: Message = {
-      id: Date.now().toString(),
-      body: input.trim(),
-      isOwn: true,
-      time: 'just now',
-    };
-    setMessages((prev) => [...prev, msg]);
-    setInput('');
-    // Simulate reply
-    setTimeout(() => {
-      setTyping(true);
-      setTimeout(() => {
-        setTyping(false);
-        setMessages((prev) => [
-          ...prev,
-          { id: Date.now().toString(), body: 'haha yeah that works for me 👍', isOwn: false, time: 'just now' },
-        ]);
-      }, 2000);
-    }, 800);
-  }, [input]);
-
-  const sendIcebreaker = (text: string) => {
-    setInput(text);
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !currentUserId) return;
+    
+    const body = newMessage.trim();
+    setNewMessage(''); // optimistic clear
+    
+    const { error } = await supabase
+      .from('messages')
+      .insert({
+        match_id: matchId,
+        sender_id: currentUserId,
+        body: body
+      });
+      
+    if (error) {
+      console.error('Failed to send message:', error);
+    } else {
+      // Update the last_message_at in matches table
+      await supabase.from('matches').update({ last_message_at: new Date().toISOString() }).eq('id', matchId);
+    }
   };
 
-  const hasMessages = messages.length > 0;
-
   return (
-    <main className="h-screen bg-ink-950 flex flex-col" aria-label={`Chat with ${meta.name}`}>
+    <main className="flex flex-col h-[100dvh]" style={{ background: 'var(--ink-950)' }}>
       {/* Header */}
-      <div className="flex items-center gap-4 px-4 py-4 glass sticky top-0 z-40">
-        <Link href="/matches" aria-label="Back to matches" className="text-bone-400 hover:text-bone-100 transition-colors" style={{ transitionDuration: '240ms' }}>
-          <ArrowLeft className="w-5 h-5" aria-hidden="true" />
+      <header className="flex items-center gap-4 p-4 border-b" style={{ borderColor: 'var(--border-default)' }}>
+        <Link href="/matches" className="p-2 -ml-2 rounded-full active:bg-ink-800 transition-colors">
+          <ArrowLeft className="w-6 h-6 text-bone-100" />
         </Link>
-
-        <div
-          className="w-10 h-10 rounded-full flex items-center justify-center font-semibold shrink-0"
-          style={{ background: `${meta.color}20`, border: `1px solid ${meta.color}40`, color: meta.color }}
-          aria-hidden="true"
-        >
-          {meta.name[0]}
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <p className="text-body font-semibold text-bone-100 truncate">{meta.name}</p>
-          <p className="text-body-sm capitalize" style={{ color: meta.color }}>
-            {meta.mode} mode
-          </p>
-        </div>
-      </div>
-
-      {/* Messages */}
-      <div
-        className="flex-1 overflow-y-auto px-4 py-4 space-y-3"
-        role="log"
-        aria-label="Chat messages"
-        aria-live="polite"
-      >
-        {messages.map((msg, i) => (
-          <motion.div
-            key={msg.id}
-            className={`flex ${msg.isOwn ? 'justify-end' : 'justify-start'}`}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2, ease: ease.out }}
-          >
-            <div
-              className="max-w-xs px-4 py-2.5 rounded-2xl text-body"
-              style={{
-                background: msg.isOwn ? 'rgba(255,106,46,0.15)' : 'var(--ink-700)',
-                border: `1px solid ${msg.isOwn ? 'rgba(255,106,46,0.25)' : 'var(--border-hairline)'}`,
-                color: msg.isOwn ? 'var(--bone-100)' : 'var(--bone-100)',
-              }}
-            >
-              {msg.body}
+        {otherUser && (
+          <div className="flex items-center gap-3">
+            <div className="relative w-10 h-10 rounded-full overflow-hidden border border-border-default">
+              {otherUser.photo_url ? (
+                 <Image src={otherUser.photo_url} alt="" fill className="object-cover" />
+              ) : (
+                <div className="w-full h-full bg-ink-700 flex items-center justify-center">
+                  <span className="text-bone-400 font-display text-lg">{otherUser.display_name[0]}</span>
+                </div>
+              )}
             </div>
-          </motion.div>
-        ))}
+            <h2 className="text-body font-bold text-bone-50">{otherUser.display_name}</h2>
+          </div>
+        )}
+      </header>
 
-        {/* Typing indicator */}
-        <AnimatePresence>
-          {typing && (
-            <motion.div
-              className="flex justify-start"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              aria-label={`${meta.name} is typing`}
-              role="status"
-            >
-              <div
-                className="px-4 py-3 rounded-2xl flex items-center gap-1.5"
-                style={{ background: 'var(--ink-700)', border: '1px solid var(--border-hairline)' }}
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((msg, i) => {
+          const isMe = msg.sender_id === currentUserId;
+          return (
+            <div key={msg.id || i} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+              <div 
+                className={`max-w-[75%] p-3 px-4 rounded-2xl text-body ${isMe ? 'rounded-tr-sm' : 'rounded-tl-sm'}`}
+                style={{
+                  background: isMe ? 'var(--ember-500)' : 'var(--ink-800)',
+                  color: isMe ? '#000' : 'var(--bone-100)',
+                  border: isMe ? 'none' : '1px solid var(--border-default)'
+                }}
               >
-                {[0, 1, 2].map((i) => (
-                  <div
-                    key={i}
-                    className="w-1.5 h-1.5 rounded-full bg-bone-400"
-                    style={{
-                      animation: `pulse-dot 1.4s ease-in-out infinite`,
-                      animationDelay: `${i * 0.16}s`,
-                    }}
-                    aria-hidden="true"
-                  />
-                ))}
+                {msg.body}
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
+            </div>
+          );
+        })}
         <div ref={bottomRef} />
       </div>
 
-      {/* Icebreakers */}
-      {!hasMessages && (
-        <div className="px-4 pb-2 flex gap-2 overflow-x-auto" aria-label="Suggested openers">
-          {meta.icebreakers.map((text) => (
-            <button
-              key={text}
-              onClick={() => sendIcebreaker(text)}
-              className="shrink-0 text-body-sm px-3 py-1.5 rounded-full transition-all"
-              style={{
-                background: 'var(--ink-700)',
-                border: '1px solid var(--border-default)',
-                color: 'var(--bone-300)',
-                transition: 'all 240ms cubic-bezier(0.16,1,0.3,1)',
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.borderColor = meta.color;
-                (e.currentTarget as HTMLElement).style.color = meta.color;
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-default)';
-                (e.currentTarget as HTMLElement).style.color = 'var(--bone-300)';
-              }}
-            >
-              {text}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {messages.length > 0 && (
-        <div className="px-4 pb-2 flex gap-2 overflow-x-auto">
-          {meta.icebreakers.slice(0, 2).map((text) => (
-            <button
-              key={text}
-              onClick={() => sendIcebreaker(text)}
-              className="shrink-0 text-body-sm px-3 py-1.5 rounded-full"
-              style={{
-                background: 'transparent',
-                border: `1px solid ${meta.color}40`,
-                color: meta.color,
-                opacity: 0.7,
-                transition: 'opacity 240ms',
-              }}
-              onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.opacity = '1')}
-              onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.opacity = '0.7')}
-            >
-              {text}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Input */}
-      <div
-        className="px-4 py-4 flex items-center gap-3"
-        style={{ borderTop: '1px solid var(--border-hairline)' }}
-      >
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-          placeholder="say something…"
-          className="flex-1 px-4 py-3 rounded-full text-bone-100 placeholder:text-bone-500 text-body focus:outline-none"
-          style={{
-            background: 'var(--ink-700)',
-            border: '1px solid var(--border-default)',
-            transition: 'border-color 240ms',
-          }}
-          aria-label="Type a message"
-        />
-        <motion.button
-          onClick={sendMessage}
-          disabled={!input.trim()}
-          className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 transition-all"
-          style={{
-            background: input.trim() ? 'var(--ember-500)' : 'var(--ink-700)',
-            border: '1px solid var(--border-default)',
-            boxShadow: input.trim() ? 'var(--shadow-ember)' : 'none',
-            transition: 'all 240ms cubic-bezier(0.16,1,0.3,1)',
-          }}
-          whileHover={input.trim() ? { scale: 1.08 } : {}}
-          whileTap={input.trim() ? { scale: 0.92 } : {}}
-          aria-label="Send message"
-        >
-          <Send className="w-4 h-4" style={{ color: input.trim() ? 'var(--ink-900)' : 'var(--bone-500)' }} aria-hidden="true" />
-        </motion.button>
+      {/* Input Area */}
+      <div className="p-4 bg-ink-950 border-t" style={{ borderColor: 'var(--border-default)' }}>
+        <form onSubmit={handleSend} className="flex items-center gap-2">
+          <input
+            type="text"
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder="Type a message..."
+            className="flex-1 bg-ink-900 border border-border-default rounded-full px-5 py-3 text-bone-100 placeholder:text-bone-500 focus:outline-none focus:border-ember-500 transition-colors"
+          />
+          <button 
+            type="submit"
+            disabled={!newMessage.trim()}
+            className="w-12 h-12 flex items-center justify-center rounded-full bg-ember-500 text-black disabled:opacity-50 disabled:bg-ink-800 disabled:text-bone-500 transition-all shrink-0"
+          >
+            <Send className="w-5 h-5" />
+          </button>
+        </form>
       </div>
     </main>
   );

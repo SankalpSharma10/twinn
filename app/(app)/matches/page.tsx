@@ -1,193 +1,122 @@
 'use client';
-import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import Image from 'next/image';
 import Link from 'next/link';
-import { copy } from '@/copy/strings';
-import { MessageCircle, ArrowLeft, Search } from 'lucide-react';
-import { ease } from '@/lib/motion/tokens';
-import type { Metadata } from 'next';
+import { Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 
-const tabs = ['New', 'Active', 'Fading'] as const;
-type Tab = typeof tabs[number];
-
-// Seeded match data
-const seedMatches = [
-  {
-    id: 'm1', name: 'Maya Patel',    major: 'Data Science',   mode: 'study',     lastMsg: 'library tomorrow at 2pm?',            time: '2m',  unread: 2, modeColor: '#8FB37A',
-  },
-  {
-    id: 'm2', name: 'Jordan Kim',    major: 'Electrical Eng', mode: 'study',     lastMsg: 'yeah that problem set was brutal lol', time: '14m', unread: 0, modeColor: '#8FB37A',
-  },
-  {
-    id: 'm3', name: 'Alex Chen',     major: 'CS',             mode: 'hackathon', lastMsg: 'I\'m thinking a sustainability angle', time: '1h',  unread: 1, modeColor: '#E8B34A',
-  },
-  {
-    id: 'm4', name: 'Priya Nair',    major: 'Pre-Med',        mode: 'gym',       lastMsg: '6:45am. I\'ll be there',               time: '3h',  unread: 0, modeColor: '#FF6A2E',
-  },
-  {
-    id: 'm5', name: 'Leo Santos',    major: 'CS + Econ',      mode: 'gym',       lastMsg: 'upper body today, legs Friday?',       time: '5h',  unread: 0, modeColor: '#FF6A2E',
-  },
-  {
-    id: 'm6', name: 'Nina Wu',       major: 'Bioengineering', mode: 'study',     lastMsg: 'orgo is actually killing me',           time: '1d',  unread: 0, modeColor: '#8FB37A',
-  },
-];
-
-const tabCounts: Record<Tab, number> = { New: 3, Active: 9, Fading: 2 };
+type MatchWithProfile = {
+  id: string;
+  matched_at: string;
+  last_message_at: string | null;
+  mode_id: string;
+  other_user: {
+    id: string;
+    display_name: string;
+    photo_url: string | null;
+  };
+  last_message?: string;
+};
 
 export default function MatchesPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('Active');
-  const [search, setSearch] = useState('');
+  const [matches, setMatches] = useState<MatchWithProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
 
-  const filtered = seedMatches.filter((m) =>
-    m.name.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => {
+    async function loadMatches() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Fetch matches where current user is user_a OR user_b
+      const { data, error } = await supabase
+        .from('matches')
+        .select(`
+          id, matched_at, last_message_at, mode_id, user_a, user_b,
+          profile_a:profiles!matches_user_a_fkey(id, display_name, photo_url),
+          profile_b:profiles!matches_user_b_fkey(id, display_name, photo_url)
+        `)
+        .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
+        .order('last_message_at', { ascending: false, nullsFirst: false });
+
+      if (error) {
+        console.error('Error loading matches:', error);
+      } else if (data) {
+        const formatted = data.map((m: any) => {
+          const isUserA = m.user_a === user.id;
+          const otherProfile = isUserA ? m.profile_b : m.profile_a;
+          return {
+            id: m.id,
+            matched_at: m.matched_at,
+            last_message_at: m.last_message_at,
+            mode_id: m.mode_id,
+            other_user: otherProfile
+          };
+        });
+        setMatches(formatted);
+      }
+      setLoading(false);
+    }
+    loadMatches();
+  }, [supabase]);
+
+  if (loading) {
+    return (
+      <main className="min-h-screen flex items-center justify-center" style={{ background: 'var(--ink-950)' }}>
+        <Loader2 className="w-8 h-8 text-bone-500 animate-spin" />
+      </main>
+    );
+  }
 
   return (
-    <main className="min-h-screen bg-ink-950 flex flex-col" aria-label="Your matches">
-      {/* Header */}
-      <div className="px-6 py-5 sticky top-0 z-40 glass">
-        <div className="max-w-lg mx-auto">
-          <div className="flex items-center justify-between mb-5">
-            <Link href="/discover/study" className="text-bone-400 hover:text-bone-100 transition-colors" style={{ transitionDuration: '240ms' }} aria-label="Back to discover">
-              <ArrowLeft className="w-5 h-5" aria-hidden="true" />
-            </Link>
-            <h1 className="text-h2 font-display text-bone-100">Matches</h1>
-            <div className="w-5" aria-hidden="true" />
+    <main className="min-h-screen p-6" style={{ background: 'var(--ink-950)' }}>
+      <h1 className="display-sm text-bone-50 mb-8 mt-12">Your Matches</h1>
+      
+      {matches.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="w-16 h-16 rounded-full bg-ink-800 flex items-center justify-center mb-4">
+            <span className="text-2xl">👻</span>
           </div>
-
-          {/* Search */}
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-bone-500" aria-hidden="true" />
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="search matches…"
-              className="w-full pl-10 pr-4 py-2.5 rounded-lg text-bone-100 placeholder:text-bone-500 text-body-sm focus:outline-none"
-              style={{
-                background: 'var(--ink-700)',
-                border: '1px solid var(--border-default)',
-                transition: 'border-color 240ms',
-              }}
-              aria-label="Search your matches"
-            />
-          </div>
-
-          {/* Tabs */}
-          <div className="flex gap-0" role="tablist" aria-label="Match categories">
-            {tabs.map((tab) => (
-              <button
-                key={tab}
-                role="tab"
-                aria-selected={activeTab === tab}
-                onClick={() => setActiveTab(tab)}
-                className="relative flex items-center gap-1.5 px-4 py-2 text-body-sm font-medium transition-colors"
-                style={{
-                  color: activeTab === tab ? 'var(--bone-100)' : 'var(--bone-500)',
-                  transitionDuration: '240ms',
-                }}
-              >
-                {tab}
-                {tabCounts[tab] > 0 && (
-                  <span
-                    className="text-caption font-bold px-1.5 py-0.5 rounded-full"
-                    style={{
-                      background: activeTab === tab ? 'var(--ember-500)' : 'var(--ink-600)',
-                      color: activeTab === tab ? 'var(--ink-900)' : 'var(--bone-400)',
-                    }}
-                  >
-                    {tabCounts[tab]}
-                  </span>
-                )}
-                {activeTab === tab && (
-                  <motion.div
-                    layoutId="tab-underline"
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-ember-500 rounded-full"
-                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                  />
-                )}
-              </button>
-            ))}
-          </div>
+          <p className="text-body text-bone-300">No matches yet. Keep swiping!</p>
         </div>
-      </div>
-
-      {/* Match list */}
-      <div className="flex-1 px-6 py-4">
-        <div className="max-w-lg mx-auto space-y-1">
-          {filtered.length === 0 ? (
-            <div className="text-center py-24">
-              <MessageCircle className="w-10 h-10 text-bone-600 mx-auto mb-4" aria-hidden="true" />
-              <p className="text-body text-bone-400">{copy.empty.matches.all}</p>
-            </div>
-          ) : (
-            filtered.map((match, i) => (
-              <motion.div
-                key={match.id}
-                initial={{ opacity: 0, y: 16 }}
+      ) : (
+        <div className="space-y-4">
+          {matches.map((match, i) => (
+            <Link key={match.id} href={`/chat/${match.id}`}>
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, ease: ease.out, delay: i * 0.04 }}
+                transition={{ delay: i * 0.05 }}
+                className="flex items-center gap-4 p-4 rounded-2xl transition-colors active:scale-[0.98]"
+                style={{ background: 'var(--ink-800)', border: '1px solid var(--border-default)' }}
               >
-                <Link
-                  href={`/chat/${match.id}`}
-                  className="flex items-center gap-4 px-4 py-4 rounded-xl group"
-                  style={{
-                    transition: 'background 240ms',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--ink-700)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                  aria-label={`Chat with ${match.name}`}
-                >
-                  {/* Avatar */}
-                  <div className="relative shrink-0">
-                    <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold"
-                      style={{
-                        background: `${match.modeColor}20`,
-                        border: `1px solid ${match.modeColor}40`,
-                        color: match.modeColor,
-                      }}
-                    >
-                      {match.name[0]}
-                    </div>
-                    {/* Mode dot */}
-                    <div
-                      className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2"
-                      style={{
-                        background: match.modeColor,
-                        borderColor: 'var(--ink-950)',
-                      }}
-                      aria-hidden="true"
-                    />
-                  </div>
-
-                  {/* Text */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2 mb-0.5">
-                      <p className="text-body font-semibold text-bone-100 truncate">{match.name}</p>
-                      <span className="text-caption text-bone-500 shrink-0" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
-                        {match.time}
-                      </span>
-                    </div>
-                    <p className="text-body-sm text-bone-400 truncate">{match.lastMsg}</p>
-                  </div>
-
-                  {/* Unread dot */}
-                  {match.unread > 0 && (
-                    <div
-                      className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
-                      style={{ background: 'var(--ember-500)' }}
-                      aria-label={`${match.unread} unread messages`}
-                    >
-                      <span className="text-caption text-ink-900 font-bold leading-none">{match.unread}</span>
+                {/* Avatar */}
+                <div className="relative w-14 h-14 rounded-full overflow-hidden shrink-0 border border-border-default">
+                  {match.other_user.photo_url ? (
+                    <Image src={match.other_user.photo_url} alt="" fill className="object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-ink-700 flex items-center justify-center">
+                      <span className="text-bone-400 font-display text-xl">{match.other_user.display_name[0]}</span>
                     </div>
                   )}
-                </Link>
+                </div>
+
+                {/* Details */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-center mb-1">
+                    <h3 className="text-body font-bold text-bone-100 truncate">{match.other_user.display_name}</h3>
+                    <span className="text-caption text-bone-500 uppercase tracking-wider">{match.mode_id}</span>
+                  </div>
+                  <p className="text-body-sm text-bone-400 truncate">
+                    Tap to chat
+                  </p>
+                </div>
               </motion.div>
-            ))
-          )}
+            </Link>
+          ))}
         </div>
-      </div>
+      )}
     </main>
   );
 }

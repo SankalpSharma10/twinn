@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { copy } from '@/copy/strings';
 import { MagneticButton } from '@/components/motion/MagneticButton';
 import { AlertCircle } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
 interface Props {
   onNext: (data: { email: string }) => void;
@@ -26,8 +27,22 @@ export function StepEmail({ onNext, setLoading }: Props) {
       return;
     }
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 800)); // simulate OTP send
+
+    const supabase = createClient();
+    const { error: authError } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: true,
+      },
+    });
+
     setLoading(false);
+
+    if (authError) {
+      setError(authError.message);
+      return;
+    }
+
     onNext({ email });
   };
 

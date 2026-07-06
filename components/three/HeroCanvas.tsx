@@ -27,7 +27,7 @@ export function HeroCanvas() {
           <TwinnParticles />
         </Suspense>
 
-        <EffectComposer disableNormalPass multisampling={0}>
+        <EffectComposer multisampling={0}>
           <Bloom
             luminanceThreshold={0.2}
             luminanceSmoothing={0.9}

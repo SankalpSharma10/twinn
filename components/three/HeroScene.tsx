@@ -113,7 +113,7 @@ export function HeroScene() {
         </Suspense>
 
         {/* Cinematic Post-Processing Pipeline */}
-        <EffectComposer disableNormalPass multisampling={4}>
+        <EffectComposer multisampling={4}>
           <Bloom 
             luminanceThreshold={0.85} 
             luminanceSmoothing={0.5} 

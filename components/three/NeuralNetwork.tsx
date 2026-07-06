@@ -25,8 +25,8 @@ export function NeuralNetwork() {
     const vel0 = gpu.createTexture();
     
     // Seed positions (sphere) and velocities (zero)
-    const posArray = pos0.image.data;
-    const velArray = vel0.image.data;
+    const posArray = pos0.image.data!;
+    const velArray = vel0.image.data!;
     
     for (let i = 0; i < posArray.length; i += 4) {
       // Random position inside a radius

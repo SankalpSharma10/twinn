@@ -1,0 +1,56 @@
+:root {
+  /* Ink — background layers */
+  --ink-950: #080706;
+  --ink-900: #0B0A08;
+  --ink-800: #12100D;
+  --ink-700: #1A1714;
+  --ink-600: #241F1A;
+  --ink-500: #33291F;
+
+  /* Bone — text */
+  --bone-50:  #FDFBF7;
+  --bone-100: #F5F1EA;
+  --bone-200: #E8E1D3;
+  --bone-300: #C9BFAD;
+  --bone-400: #948A78;
+  --bone-500: #5F574A;
+
+  /* Ember — the one accent */
+  --ember-50:  #FFF2E8;
+  --ember-200: #FFCFA8;
+  --ember-400: #FF9E5B;
+  --ember-500: #FF6A2E;
+  --ember-600: #E5501A;
+  --ember-700: #B23B0F;
+
+  /* System */
+  --success: #8FB37A;
+  --warning: #E8B34A;
+  --error:   #D65545;
+
+  /* Borders */
+  --border-hairline: rgba(245, 241, 234, 0.06);
+  --border-default:  rgba(245, 241, 234, 0.10);
+  --border-strong:   rgba(245, 241, 234, 0.18);
+
+  /* Shadows */
+  --shadow-card:
+    0 1px 0 rgba(255,255,255,0.04) inset,
+    0 20px 40px -20px rgba(0,0,0,0.6),
+    0 8px 16px -8px rgba(0,0,0,0.4);
+  --shadow-ember:
+    0 0 0 1px rgba(255,106,46,0.15),
+    0 10px 40px -10px rgba(255,106,46,0.35),
+    0 0 60px -20px rgba(255,106,46,0.25);
+  --shadow-lifted:
+    0 30px 60px -30px rgba(0,0,0,0.8),
+    0 18px 36px -18px rgba(0,0,0,0.5);
+
+  /* Radii */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+  --r-xl: 24px;
+  --r-2xl: 32px;
+  --r-full: 999px;
+}

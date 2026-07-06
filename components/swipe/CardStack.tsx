@@ -9,7 +9,7 @@ import { X, ArrowRight, Star } from 'lucide-react';
 interface Props {
   profiles: Profile[];
   onSwipe: (profileId: string, decision: 'like' | 'pass' | 'super') => Promise<{ matched: boolean }>;
-  mode: 'study' | 'hackathon' | 'gym';
+  mode: 'study' | 'hackathon' | 'gym' | 'twinn';
 }
 
 export function CardStack({ profiles: initialProfiles, onSwipe, mode }: Props) {

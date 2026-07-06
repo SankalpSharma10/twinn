@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Manifesto — VibeMatch',
+  title: 'Manifesto — Twinn',
   description: 'A love letter to students who actually show up.',
 };
 
@@ -17,7 +17,7 @@ export default function ManifestoPage() {
           className="caption text-ember-500 mb-16 tracking-widest text-center"
           aria-hidden="true"
         >
-          — VIBEMATCH MANIFESTO
+          — TWINN MANIFESTO
         </p>
 
         {/* Long-form love letter */}
@@ -78,7 +78,7 @@ export default function ManifestoPage() {
           </p>
 
           <p className="body-lg text-bone-300 leading-relaxed">
-            that's the gap we're filling. vibematch isn't a social network. it's not a dating app.
+            that's the gap we're filling. twinn isn't a social network. it's not a dating app.
             it's a reliability filter. a shared accountability partner. a way of saying: i'm going
             to show up — do you want to show up too?
           </p>
@@ -113,7 +113,7 @@ export default function ManifestoPage() {
               fontVariationSettings: "'opsz' 72, 'SOFT' 50, 'wght' 300",
             }}
           >
-            — vibematch
+            — twinn
           </p>
         </article>
 

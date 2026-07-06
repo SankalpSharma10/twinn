@@ -8,6 +8,7 @@ const columns = [
       { label: 'Study mode',     href: '/discover/study' },
       { label: 'Hackathon mode', href: '/discover/hackathon' },
       { label: 'Gym mode',       href: '/discover/gym' },
+      { label: 'Twinn mode',     href: '/discover/twinn' },
     ],
   },
   {
@@ -66,7 +67,7 @@ export function Footer() {
 
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-t border-hairline pt-8">
           <div className="flex items-center gap-2">
-            <span className="font-display text-lg text-bone-400">vibematch</span>
+            <span className="font-display text-lg text-bone-400">twinn</span>
             <span
               className="w-1.5 h-1.5 rounded-full bg-ember-500"
               aria-hidden="true"
@@ -74,7 +75,7 @@ export function Footer() {
             />
           </div>
           <p className="text-body-sm text-bone-500 text-center">
-            © {new Date().getFullYear()} VibeMatch. campus-only. always.
+            © {new Date().getFullYear()} Twinn. campus-only. always.
           </p>
           <p className="text-body-sm text-bone-500">
             built with{' '}

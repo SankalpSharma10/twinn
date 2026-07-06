@@ -135,7 +135,7 @@ export default function LandingPage() {
       <section id="modes" className="py-32 px-6 md:px-12" aria-label="Modes">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <p className="caption mb-4" style={{ color: 'var(--ember-500)', letterSpacing: '0.16em' }}>THREE MODES. ONE REASON.</p>
+            <p className="caption mb-4" style={{ color: 'var(--ember-500)', letterSpacing: '0.16em' }}>FOUR MODES. ONE REASON.</p>
             <h2 className="display-lg" style={{ color: 'var(--bone-100)' }}>built for how you actually live.</h2>
           </div>
 

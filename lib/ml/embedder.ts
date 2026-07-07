@@ -17,19 +17,8 @@ class PipelineSingleton {
   }
 }
 
-self.addEventListener('message', async (event) => {
-  // Load the model
-  const embedder = await PipelineSingleton.getInstance((x: any) => {
-    // Send loading progress back to the main thread
-    self.postMessage(x);
-  });
-  
-  // Actually run the ML inference on the user's vibe string!
-  const output = await embedder(event.data.text, { pooling: 'mean', normalize: true });
-  
-  // Return the float array back to the main React thread
-  self.postMessage({
-    status: 'complete',
-    output: Array.from(output.data),
-  });
-});
+export async function generateEmbedding(text: string, onProgress?: (info: any) => void): Promise<number[]> {
+  const embedder = await PipelineSingleton.getInstance(onProgress);
+  const output = await embedder(text, { pooling: 'mean', normalize: true });
+  return Array.from(output.data);
+}

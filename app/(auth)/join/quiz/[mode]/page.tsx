@@ -49,34 +49,32 @@ export default function QuizPage({ params }: { params: Promise<{ mode: string }>
     const answerStrings = Object.entries(finalAnswers).map(([k, v]) => `${k}: ${v}`);
     const quizText = `${mode} mode preferences: ${answerStrings.join(', ')}`;
 
-    // Call the Web Worker to generate the vector
-    const worker = new Worker(new URL('../../../../../lib/ml/worker.ts', import.meta.url), { type: 'module' });
-    
-    worker.postMessage({ text: quizText });
-    
-    worker.addEventListener('message', async (event) => {
-      if (event.data.status === 'complete') {
-        const quiz_vector = event.data.output;
+    try {
+      const ml = await import('@/lib/ml/embedder');
+      const quiz_vector = await ml.generateEmbedding(quizText);
 
-        // Save to Supabase user_modes
-        const { error } = await supabase
-          .from('user_modes')
-          .update({
-            quiz_answers: finalAnswers,
-            quiz_vector: quiz_vector
-          })
-          .eq('user_id', user.id)
-          .eq('mode_id', mode);
-          
-        if (error) {
-          console.error('Error saving quiz:', error);
-        }
-
-        setLoading(false);
-        // Redirect to discover or back to step 7
-        router.push('/join?step=7');
+      // Save to Supabase user_modes
+      const { error } = await supabase
+        .from('user_modes')
+        .update({
+          quiz_answers: finalAnswers,
+          quiz_vector: quiz_vector
+        })
+        .eq('user_id', user.id)
+        .eq('mode_id', mode);
+        
+      if (error) {
+        console.error('Error saving quiz:', error);
       }
-    });
+
+      setLoading(false);
+      // Redirect to discover or back to step 7
+      router.push('/join?step=7');
+    } catch (err) {
+      console.error('ML Error:', err);
+      setLoading(false);
+      router.push('/join?step=7');
+    }
   };
 
   if (!questions.length) return null;

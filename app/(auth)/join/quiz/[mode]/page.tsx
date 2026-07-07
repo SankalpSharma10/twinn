@@ -20,7 +20,7 @@ export default function QuizPage({ params }: { params: Promise<{ mode: string }>
   // If invalid mode, redirect
   useEffect(() => {
     if (!questions.length) {
-      router.push('/join?step=7');
+      router.push('/discover/study');
     }
   }, [mode, questions, router]);
 
@@ -68,12 +68,11 @@ export default function QuizPage({ params }: { params: Promise<{ mode: string }>
       }
 
       setLoading(false);
-      // Redirect to discover or back to step 7
-      router.push('/join?step=7');
+      router.push('/discover/' + mode);
     } catch (err) {
       console.error('ML Error:', err);
       setLoading(false);
-      router.push('/join?step=7');
+      router.push('/discover/' + mode);
     }
   };
 
@@ -88,7 +87,7 @@ export default function QuizPage({ params }: { params: Promise<{ mode: string }>
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <button 
-            onClick={() => currentIdx > 0 ? setCurrentIdx(c => c - 1) : router.push('/join?step=7')}
+            onClick={() => currentIdx > 0 ? setCurrentIdx(c => c - 1) : router.back()}
             className="w-10 h-10 rounded-full flex items-center justify-center"
             style={{ background: 'var(--ink-800)' }}
           >

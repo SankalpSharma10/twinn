@@ -6,6 +6,7 @@ import { MagneticButton } from '@/components/motion/MagneticButton';
 import { AlertCircle } from 'lucide-react';
 import { ease } from '@/lib/motion/tokens';
 import { createClient } from '@/lib/supabase/client';
+import { useRouter } from 'next/navigation';
 
 interface Props {
   email: string;
@@ -21,6 +22,7 @@ export function StepOTP({ email, onNext, setLoading }: Props) {
   const [error, setError] = useState('');
   const [resendTimer, setResendTimer] = useState(RESEND_DELAY);
   const refs = useRef<(HTMLInputElement | null)[]>([]);
+  const router = useRouter();
 
   useEffect(() => {
     if (resendTimer <= 0) return;
@@ -69,6 +71,22 @@ export function StepOTP({ email, onNext, setLoading }: Props) {
     if (authError) {
       setError(authError.message);
       return;
+    }
+
+    // Check if user already exists
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id)
+        .single();
+        
+      if (profile) {
+        // Returning user, drop them into the app
+        router.push('/discover/study');
+        return;
+      }
     }
 
     onNext({ verified: true });

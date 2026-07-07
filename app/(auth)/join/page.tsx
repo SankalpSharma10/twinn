@@ -50,50 +50,47 @@ export default function JoinPage() {
         // --- ML VECTOR GENERATION ---
         const vibeString = `Student in ${data.major}, Class of ${data.year}. Music taste: ${data.artist_hindi}, ${data.artist_english}, ${data.artist_punjabi}.`;
         
-        const worker = new Worker(new URL('../../../lib/ml/worker.ts', import.meta.url), { type: 'module' });
-        
-        worker.postMessage({ text: vibeString });
-        
-        worker.addEventListener('message', async (event) => {
-          if (event.data.status === 'complete') {
-            const vibe_vector = event.data.output; // The 384 array!
+        try {
+          const ml = await import('@/lib/ml/embedder');
+          const vibe_vector = await ml.generateEmbedding(vibeString); // The 384 array!
 
-            // 1. Upsert Profile
-            const { error: profileError } = await supabase
-              .from('profiles')
+          // 1. Upsert Profile
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .upsert({
+              id: user.id,
+              email,
+              edu_domain,
+              display_name,
+              pronouns: data.pronouns as string,
+              year: data.year as string,
+              major: data.major as string,
+              artist_hindi: data.artist_hindi as string,
+              artist_english: data.artist_english as string,
+              artist_punjabi: data.artist_punjabi as string,
+              vibe_vector: vibe_vector, // Save the ML vector
+              photo_blurhash,
+              verified: true,
+            }, { onConflict: 'id' });
+          
+          if (profileError) console.error('Error saving profile:', profileError);
+
+          // 2. Upsert Modes
+          const modes = (data.modes as string[]) || [];
+          for (const mode of modes) {
+            const { error: modeError } = await supabase
+              .from('user_modes')
               .upsert({
-                id: user.id,
-                email,
-                edu_domain,
-                display_name,
-                pronouns: data.pronouns as string,
-                year: data.year as string,
-                major: data.major as string,
-                artist_hindi: data.artist_hindi as string,
-                artist_english: data.artist_english as string,
-                artist_punjabi: data.artist_punjabi as string,
-                vibe_vector: vibe_vector, // Save the ML vector
-                photo_blurhash,
-                verified: true,
-              }, { onConflict: 'id' });
+                user_id: user.id,
+                mode_id: mode,
+                active: true,
+              }, { onConflict: 'user_id,mode_id' });
             
-            if (profileError) console.error('Error saving profile:', profileError);
-
-            // 2. Upsert Modes
-            const modes = (data.modes as string[]) || [];
-            for (const mode of modes) {
-              const { error: modeError } = await supabase
-                .from('user_modes')
-                .upsert({
-                  user_id: user.id,
-                  mode_id: mode,
-                  active: true,
-                }, { onConflict: 'user_id,mode_id' });
-              
-              if (modeError) console.error(`Error saving mode ${mode}:`, modeError);
-            }
+            if (modeError) console.error(`Error saving mode ${mode}:`, modeError);
           }
-        });
+        } catch (err) {
+          console.error('ML Embedder Error:', err);
+        }
       };
 
       saveProfile();

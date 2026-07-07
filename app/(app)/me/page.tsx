@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { copy } from '@/copy/strings';
 import { ArrowLeft, BookOpen, Laptop, Dumbbell, ChevronRight, Bell, Lock, User, LogOut } from 'lucide-react';
 import { ease } from '@/lib/motion/tokens';
+import { createClient } from '@/lib/supabase/client';
+import { useEffect } from 'react';
 
 type Section = 'profile' | 'modes' | 'notifications' | 'privacy' | 'account';
 
@@ -16,12 +18,68 @@ const modeConfig = [
 
 export default function ProfilePage() {
   const [section, setSection] = useState<Section>('profile');
-  const [activeModes, setActiveModes] = useState({ study: true, hackathon: false, gym: true });
-  const [name, setName] = useState('Alex Chen');
+  const [activeModes, setActiveModes] = useState({ study: false, hackathon: false, gym: false });
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [bio, setBio]   = useState('');
+  const [loading, setLoading] = useState(true);
 
-  const toggleMode = (id: string) => {
-    setActiveModes((prev) => ({ ...prev, [id]: !prev[id as keyof typeof prev] }));
+  useEffect(() => {
+    let mounted = true;
+    async function fetchProfile() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+        
+      if (mounted && data) {
+        setName(data.display_name || '');
+        setEmail(data.email || '');
+        setBio(data.bio || '');
+      }
+      
+      const { data: modeData } = await supabase
+        .from('user_modes')
+        .select('mode_id, active')
+        .eq('user_id', user.id);
+        
+      if (mounted && modeData) {
+        const nextModes = { study: false, hackathon: false, gym: false };
+        modeData.forEach(m => {
+          if (m.mode_id in nextModes) {
+            nextModes[m.mode_id as keyof typeof nextModes] = m.active;
+          }
+        });
+        setActiveModes(nextModes);
+        setLoading(false);
+      }
+    }
+    fetchProfile();
+    return () => { mounted = false; };
+  }, []);
+
+  const toggleMode = async (id: string) => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    
+    const newVal = !activeModes[id as keyof typeof activeModes];
+    setActiveModes((prev) => ({ ...prev, [id]: newVal }));
+    
+    await supabase.from('user_modes').update({ active: newVal }).eq('user_id', user.id).eq('mode_id', id);
+  };
+  
+  const handleSave = async () => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from('profiles').update({ display_name: name, bio }).eq('id', user.id);
+    alert('Profile saved!');
   };
 
   const navItems: { id: Section; icon: typeof User; label: string }[] = [
@@ -62,8 +120,14 @@ export default function ProfilePage() {
             </button>
           </div>
           <div className="text-center">
-            <p className="text-h2 font-display text-bone-100">{name}</p>
-            <p className="text-body-sm text-bone-500">alex@berkeley.edu</p>
+            {loading ? (
+              <div className="h-10"></div>
+            ) : (
+              <>
+                <p className="text-h2 font-display text-bone-100">{name}</p>
+                <p className="text-body-sm text-bone-500">{email}</p>
+              </>
+            )}
           </div>
         </div>
 
@@ -131,7 +195,7 @@ export default function ProfilePage() {
                     aria-label="Bio"
                   />
                 </div>
-                <button className="btn-primary w-full" aria-label="Save profile">save changes</button>
+                <button onClick={handleSave} className="btn-primary w-full" aria-label="Save profile">save changes</button>
               </div>
             )}
 

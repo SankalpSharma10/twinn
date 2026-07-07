@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { quizzes } from '@/copy/quizzes';
@@ -8,9 +8,9 @@ import { TopProgressBar } from '@/components/motion/TopProgressBar';
 import { MagneticButton } from '@/components/motion/MagneticButton';
 import { ArrowLeft } from 'lucide-react';
 
-export default function QuizPage({ params }: { params: { mode: string } }) {
+export default function QuizPage({ params }: { params: Promise<{ mode: string }> }) {
   const router = useRouter();
-  const mode = params.mode;
+  const { mode } = use(params);
   const questions = quizzes[mode] || [];
   
   const [currentIdx, setCurrentIdx] = useState(0);
